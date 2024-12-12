@@ -1,0 +1,137 @@
+package com.acti.gradle.avro
+
+import org.apache.avro.ParseContext
+import org.apache.avro.Schema
+import org.apache.avro.compiler.specific.SpecificCompiler
+import org.apache.avro.idl.IdlReader
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.*
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.kotlin.dsl.getByType
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.register
+import java.io.File
+
+class AvroPlugin : Plugin<Project> {
+    override fun apply(target: Project) {
+        val mainSourceSet = target.extensions.getByType<SourceSetContainer>()
+            .getByName("main")
+
+        val generateAvroInlinedAvscFromIdlTask =
+            target.tasks.register("generateAvroInlinedAvscFromIdl", GenerateAvroAvscFromIdl::class) {
+                source(project.file("src/${mainSourceSet.name}"))
+                inlineReferencedSchemas = true
+                outputDir.convention(project.layout.buildDirectory.dir("generated/avro/${mainSourceSet.name}/avsc-inline"))
+            }
+
+        target.tasks.named("classes") {
+            dependsOn(generateAvroInlinedAvscFromIdlTask)
+        }
+
+        val generateAvroAvscTask = target.tasks.register("generateAvroAvscFromIdl", GenerateAvroAvscFromIdl::class) {
+            source(project.file("src/${mainSourceSet.name}"))
+            outputDir.convention(project.layout.buildDirectory.dir("generated/avro/${mainSourceSet.name}/avsc"))
+        }
+
+        val generateAvroSchemaJavaTask =
+            target.tasks.register("generateJavaFromAvroSchema", GenerateJavaFromAvroSchema::class) {
+                source(generateAvroAvscTask.get().outputDir.get())
+                outputDir.convention(project.layout.buildDirectory.dir("generated/avro/${mainSourceSet.name}/java"))
+                dependsOn(generateAvroAvscTask)
+                mainSourceSet.java.srcDir(outputDir)
+            }
+
+        target.tasks.named<JavaCompile>(mainSourceSet.compileJavaTaskName) {
+            source(generateAvroSchemaJavaTask)
+        }
+    }
+}
+
+abstract class GenerateAvroAvscFromIdl : SourceTask() {
+    init {
+        include("**/*.avdl")
+    }
+
+
+    @OutputDirectory
+    val outputDir: DirectoryProperty = project.objects.directoryProperty()
+
+
+    @Input
+    var inlineReferencedSchemas = false
+
+
+    @TaskAction
+    fun generate() {
+        val parseContext = ParseContext()
+        val reader = IdlReader(parseContext)
+        val sources = source
+        sources.forEach { source ->
+            logger.info("Will process IDL file: {}", source)
+            val parsed = runCatching { reader.parse(source.toPath()) }
+                .getOrElse {
+                    logger.warn(
+                        """Failed to parse IDL file ${source.path}. Context follows.""", it
+                    )
+                    parseContext.typesByName().forEach { name, schema ->
+                        logger.warn("parseContext.typesByName: $name -> $schema")
+                    }
+                    throw IllegalStateException("Failed to parse IDL file ${source.path}", it)
+                }
+            parsed.warnings.forEach { warning ->
+                logger.warn("IDL Warning for file ${source.path}: $warning")
+            }
+        }
+        parseContext.commit()
+
+        val otherSchemas = parseContext.resolveAllSchemas().toMutableSet()
+
+        parseContext.typesByName().forEach { (name, schema) ->
+            otherSchemas.remove(schema)
+            val outputFile = File(outputDir.get().asFile, "$name.avsc")
+            logger.debug("Output schema {} to {}", schema, outputFile)
+
+            if (inlineReferencedSchemas) {
+                @Suppress("DEPRECATION") // don't know how to do this easily with formatter
+                outputFile.writeText(schema.toString(emptySet(), true))
+            } else {
+                @Suppress("DEPRECATION") // don't know how to do this easily with formatter
+                outputFile.writeText(schema.toString(otherSchemas, true))
+            }
+
+            otherSchemas.add(schema)
+        }
+
+    }
+}
+
+
+abstract class GenerateJavaFromAvroSchema : SourceTask() {
+    init {
+        include("**/*.avsc")
+    }
+
+    @OutputDirectory
+    val outputDir: DirectoryProperty = project.objects.directoryProperty()
+
+
+    @TaskAction
+    fun generate() {
+        val parseContext = ParseContext()
+        val parser = Schema.Parser(parseContext)
+        val sourceToSchema =
+            source.associateWith { source ->
+                source.inputStream().use { parser.parseInternal(it.bufferedReader().readText()) }
+            }
+        parseContext.commit()
+        parseContext.resolveAllSchemas()
+        sourceToSchema.forEach { (source, schema) ->
+            val resolved = parseContext.getNamedSchema(schema.fullName)
+            SpecificCompiler(resolved).apply {
+                isCreateNullSafeAnnotations = true
+            }.compileToDestination(source, outputDir.get().asFile)
+        }
+    }
+}

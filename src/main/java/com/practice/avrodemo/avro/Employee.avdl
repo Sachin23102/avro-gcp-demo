@@ -1,0 +1,7 @@
+namespace com.practice.avrodemo.avro;
+
+record Employee {
+	string name;
+	int age;
+	long? salary;
+}
