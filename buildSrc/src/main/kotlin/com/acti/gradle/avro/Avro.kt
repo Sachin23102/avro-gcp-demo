@@ -1,18 +1,25 @@
 package com.acti.gradle.avro
 
+import org.apache.avro.AvroTypeException
 import org.apache.avro.ParseContext
 import org.apache.avro.Schema
+import org.apache.avro.SchemaParseException
 import org.apache.avro.compiler.specific.SpecificCompiler
 import org.apache.avro.idl.IdlReader
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.tasks.*
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.SourceTask
+import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import java.io.File
+import java.util.EnumSet
 
 class AvroPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -35,11 +42,12 @@ class AvroPlugin : Plugin<Project> {
             outputDir.convention(project.layout.buildDirectory.dir("generated/avro/${mainSourceSet.name}/avsc"))
         }
 
+        val javaGenerationSourceTask = generateAvroInlinedAvscFromIdlTask
         val generateAvroSchemaJavaTask =
             target.tasks.register("generateJavaFromAvroSchema", GenerateJavaFromAvroSchema::class) {
-                source(generateAvroAvscTask.get().outputDir.get())
+                source(javaGenerationSourceTask.get().outputDir.get())
                 outputDir.convention(project.layout.buildDirectory.dir("generated/avro/${mainSourceSet.name}/java"))
-                dependsOn(generateAvroAvscTask)
+                dependsOn(javaGenerationSourceTask)
                 mainSourceSet.java.srcDir(outputDir)
             }
 
@@ -119,16 +127,37 @@ abstract class GenerateJavaFromAvroSchema : SourceTask() {
 
     @TaskAction
     fun generate() {
+        compileEachSourceSeparately()
+//        compileEachSchemaOnce()
+    }
+
+    private fun compileEachSchemaOnce() {
         val parseContext = ParseContext()
         val parser = Schema.Parser(parseContext)
         val sourceToSchema =
             source.associateWith { source ->
-                source.inputStream().use { parser.parseInternal(it.bufferedReader().readText()) }
+                val schema = source.inputStream().use {
+                    parser.parseInternal(it.bufferedReader().readText())
+                }
+                parseContext.commit()
+                parseContext.resolveAllSchemas()
+                schema
             }
-        parseContext.commit()
-        parseContext.resolveAllSchemas()
+
         sourceToSchema.forEach { (source, schema) ->
             val resolved = parseContext.getNamedSchema(schema.fullName)
+            SpecificCompiler(resolved).apply {
+                isCreateNullSafeAnnotations = true
+            }.compileToDestination(source, outputDir.get().asFile)
+        }
+    }
+
+    private fun compileEachSourceSeparately() {
+        source.associateWith { source ->
+            logger.info("Compiling {}", source)
+            //                source.inputStream().use { parser.parse(it.bufferedReader().readText()) }
+            val parser = Schema.Parser()
+            val resolved = parser.parse(source)
             SpecificCompiler(resolved).apply {
                 isCreateNullSafeAnnotations = true
             }.compileToDestination(source, outputDir.get().asFile)

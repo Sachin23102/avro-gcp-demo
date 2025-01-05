@@ -1,7 +1,10 @@
 namespace com.practice.avrodemo.avro;
 
+import idl "ContactId.avdl";
+
 record Employee {
+	ContactId? @aliases(["id"]) contactId = null;
 	string name;
-	int age;
+	int age = 20;
 	long? salary;
 }

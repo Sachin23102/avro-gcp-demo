@@ -1,0 +1,5 @@
+namespace com.practice.avrodemo.avro;
+
+record ContactId {
+	uuid id;
+}

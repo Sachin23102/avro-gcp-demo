@@ -1,0 +1,25 @@
+namespace com.practice.avrodemo.avro;
+
+import idl "ContactId.avdl";
+import idl "EmploymentStatus.avdl";
+
+// enum with a default value
+//enum EmploymentStatus {
+//	EMPLOYED,
+//	UNEMPLOYED,
+//	SELF_EMPLOYED
+//}
+
+record User {
+	string username;
+	ContactId contactId;
+	string? email = null;
+	// how can I add a default value to an enum?
+	EmploymentStatus? employmentStatus = "EMPLOYED";	//optional field with a default value
+}
+
+// we should have a separate file for ContactId, but to demonstrate defining multiple records in a single file,
+// we have defined it here
+//@namespace("com.practice.avrodemo.avro")
+
+

@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: avrodemo
+#  cloud:
+#    stream:
+#      bindings:
+#        output:
+#          contentType: application/*+avro
+#        input:
+#          contentType: application/*+avro

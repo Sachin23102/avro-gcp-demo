@@ -1,9 +1,17 @@
+buildscript {
+	dependencies {
+		classpath("org.apache.avro:avro-tools:1.12.0")
+	}
+}
+
 plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.4.0'
 	id 'io.spring.dependency-management' version '1.1.6'
 	id("com.acti.avro")
+	id("com.diffplug.spotless") version "6.25.0"
 }
+
 
 group = 'com.practice'
 version = '0.0.1-SNAPSHOT'
@@ -14,18 +22,69 @@ java {
 	}
 }
 
+spotless {
+	java {
+		palantirJavaFormat()
+	}
+}
+
 repositories {
 	mavenCentral()
 }
 
+configurations.all {
+	exclude group: 'org.slf4j', module: 'slf4j-reload4j'
+}
+
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation ('org.springframework.boot:spring-boot-starter')
 	implementation("org.apache.avro:avro:1.12.0")
 	implementation("org.jetbrains:annotations:26.0.1")
+	implementation platform("com.google.cloud:spring-cloud-gcp-dependencies:4.8.4")
+	implementation("com.google.cloud:spring-cloud-gcp-starter-pubsub")
 
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation ('org.springframework.boot:spring-boot-starter-test')
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+task generateAvroJava {
+	dependsOn('generateAvroInlinedAvscFromIdl')
+	description = "Generates Java classes from Avro schema files."
+
+	// Adjusted directory to match your setup
+	def avroSchemaDir = layout.buildDirectory.dir("generated/avro/main/avsc").get().asFile
+	def avroOutputDir = layout.buildDirectory.dir("generated/avro/main/java").get().asFile
+
+	inputs.dir(avroSchemaDir)
+	outputs.dir(avroOutputDir)
+
+	doLast {
+		avroOutputDir.mkdirs()
+		avroSchemaDir.listFiles(new FilenameFilter() {
+			boolean accept(File dir, String name) {
+				return name.endsWith(".avsc")
+			}
+		}).each { schemaFile ->
+			println "Processing schema: ${schemaFile.name}"
+			javaexec {
+				main = "org.apache.avro.tool.Main"
+				classpath = buildscript.configurations.classpath
+				standardInput = System.in
+				standardOutput = System.out
+				args = ["compile", "schema", schemaFile.absolutePath, avroOutputDir.absolutePath]
+			}
+		}
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs += layout.buildDirectory.dir("generated/avro/main/java").get().asFile
+		}
+	}
+}
+
 
 tasks.named('test') {
 	useJUnitPlatform()

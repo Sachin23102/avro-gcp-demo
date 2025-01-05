@@ -9,6 +9,7 @@ repositories {
 dependencies {
     implementation("org.apache.avro:avro-idl:1.12.0")
     implementation("org.apache.avro:avro-compiler:1.12.0")
+    implementation("org.apache.avro:avro-tools:1.12.0")
 }
 
 gradlePlugin {
