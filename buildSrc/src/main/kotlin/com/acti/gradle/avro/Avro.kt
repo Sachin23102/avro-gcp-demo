@@ -1,9 +1,7 @@
 package com.acti.gradle.avro
 
-import org.apache.avro.AvroTypeException
 import org.apache.avro.ParseContext
 import org.apache.avro.Schema
-import org.apache.avro.SchemaParseException
 import org.apache.avro.compiler.specific.SpecificCompiler
 import org.apache.avro.idl.IdlReader
 import org.gradle.api.Plugin
@@ -19,7 +17,6 @@ import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 import java.io.File
-import java.util.EnumSet
 
 class AvroPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -127,7 +124,7 @@ abstract class GenerateJavaFromAvroSchema : SourceTask() {
 
     @TaskAction
     fun generate() {
-        compileEachSourceSeparately()
+        compileAllUsingSpecificCompiler()
 //        compileEachSchemaOnce()
     }
 
@@ -152,15 +149,15 @@ abstract class GenerateJavaFromAvroSchema : SourceTask() {
         }
     }
 
-    private fun compileEachSourceSeparately() {
-        source.associateWith { source ->
-            logger.info("Compiling {}", source)
-            //                source.inputStream().use { parser.parse(it.bufferedReader().readText()) }
+    private fun compileAllUsingSpecificCompiler() {
+        val schemas = source.map { source ->
             val parser = Schema.Parser()
-            val resolved = parser.parse(source)
-            SpecificCompiler(resolved).apply {
-                isCreateNullSafeAnnotations = true
-            }.compileToDestination(source, outputDir.get().asFile)
+            logger.info("Parsing {}", source)
+            parser.parse(source)
         }
+        val lastModifiedFile = source.maxByOrNull { it.lastModified() }
+        SpecificCompiler(schemas).apply {
+            isCreateNullSafeAnnotations = true
+        }.compileToDestination(lastModifiedFile, outputDir.get().asFile)
     }
 }
