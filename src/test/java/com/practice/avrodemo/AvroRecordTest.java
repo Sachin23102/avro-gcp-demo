@@ -1,11 +1,16 @@
 package com.practice.avrodemo;
 
+import static com.practice.avrodemo.avro.EmploymentStatus.EMPLOYED;
+import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.practice.avrodemo.avro.ContactId;
 import com.practice.avrodemo.avro.Employee;
 import java.util.UUID;
+
+import com.practice.avrodemo.avro.EmploymentStatus;
+import com.practice.avrodemo.avro.User;
 import org.junit.jupiter.api.Test;
 
 class AvroRecordTest {
@@ -36,5 +41,16 @@ class AvroRecordTest {
     void testCreatingEmployeeRecordWithoutAge() {
         Employee employee =
                 Employee.newBuilder().setName("John Doe").setSalary(1000L).build();
+    }
+
+    @Test
+    void testCreatingUserRecordWithoutEmploymentStatus() throws Exception {
+        User user = User.newBuilder()
+                .setContactId(new ContactId(UUID.randomUUID()))
+                .setUsername("sachin")
+                .setEmail("test@email.com")
+                .build();
+
+        assertThat(user.getEmploymentStatus()).isEqualTo(EMPLOYED);
     }
 }
