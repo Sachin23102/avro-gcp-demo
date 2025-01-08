@@ -5,6 +5,6 @@ import idl "ContactId.avdl";
 record Employee {
 	ContactId? @aliases(["id"]) contactId = null;
 	string name;
-	int age = 20;
+	int age = 45;
 	long? salary;
 }

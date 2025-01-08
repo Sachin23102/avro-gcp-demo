@@ -121,32 +121,9 @@ abstract class GenerateJavaFromAvroSchema : SourceTask() {
     @OutputDirectory
     val outputDir: DirectoryProperty = project.objects.directoryProperty()
 
-
     @TaskAction
     fun generate() {
         compileAllUsingSpecificCompiler()
-//        compileEachSchemaOnce()
-    }
-
-    private fun compileEachSchemaOnce() {
-        val parseContext = ParseContext()
-        val parser = Schema.Parser(parseContext)
-        val sourceToSchema =
-            source.associateWith { source ->
-                val schema = source.inputStream().use {
-                    parser.parseInternal(it.bufferedReader().readText())
-                }
-                parseContext.commit()
-                parseContext.resolveAllSchemas()
-                schema
-            }
-
-        sourceToSchema.forEach { (source, schema) ->
-            val resolved = parseContext.getNamedSchema(schema.fullName)
-            SpecificCompiler(resolved).apply {
-                isCreateNullSafeAnnotations = true
-            }.compileToDestination(source, outputDir.get().asFile)
-        }
     }
 
     private fun compileAllUsingSpecificCompiler() {

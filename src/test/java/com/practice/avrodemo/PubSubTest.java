@@ -2,9 +2,7 @@ package com.practice.avrodemo;
 
 import com.google.cloud.spring.pubsub.core.PubSubTemplate;
 import com.practice.avrodemo.avro.ContactId;
-import com.practice.avrodemo.avro.EmploymentStatus;
 import com.practice.avrodemo.avro.User;
-import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -19,14 +17,13 @@ public class PubSubTest {
     PubSubTemplate pubSubTemplate;
 
     @Test
-    void canSendMessageViaPubSubTemplate() throws ExecutionException, InterruptedException, IOException {
+    void canSendMessageViaPubSubTemplate() throws ExecutionException, InterruptedException {
         var userRecord = User.newBuilder()
                 .setContactId(new ContactId(UUID.randomUUID()))
                 .setUsername("sachin")
-                .setEmail("test@email.com")
-//                .setEmploymentStatus(EmploymentStatus.SELF_EMPLOYED)
+                .setEmail("test@email.com") // or .setEmail(null)
+                //                .setEmploymentStatus(EmploymentStatus.SELF_EMPLOYED)
                 .build();
-//        Reload4jLoggerAdapter
         var response = pubSubTemplate.publish(
                 "sachin-avro-demo.employee", userRecord, Map.of("content-type", "application/avro"));
         System.out.println(response.get());
@@ -39,7 +36,7 @@ public class PubSubTest {
                 "sachin-avro-demo.employee",
                 (message) -> {
                     System.out.println("Received message: " + message.getPayload());
-                    //                                                            message.ack();
+                    //                    message.ack();
                 },
                 User.class);
         Thread.sleep(6000);

@@ -1,8 +1,0 @@
-namespace com.practice.avrodemo.avro;
-
-
-enum EmploymentStatus {
-	EMPLOYED,
-	UNEMPLOYED,
-	SELF_EMPLOYED
-}

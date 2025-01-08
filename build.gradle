@@ -47,6 +47,8 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+
+// we could either use the kotlin plugin or the below code to generate the avro classes
 task generateAvroJava {
 	dependsOn('generateAvroInlinedAvscFromIdl')
 	description = "Generates Java classes from Avro schema files."
